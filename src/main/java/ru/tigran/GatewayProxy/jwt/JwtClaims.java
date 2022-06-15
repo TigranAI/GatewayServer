@@ -1,15 +1,12 @@
 package ru.tigran.gatewayproxy.jwt;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 
+import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 
 public class JwtClaims {
     Claims claims;
-
     private JwtClaims(Claims claims) {
         this.claims = claims;
     }
@@ -25,10 +22,10 @@ public class JwtClaims {
     public String getRefreshToken(){
         return (String) claims.get("jrt");
     }
-
-    public HashSet<String> getAuthorities() throws JsonProcessingException {
-        String ath = (String) claims.get("ath");
-        ObjectMapper mapper = new ObjectMapper();
-        return new HashSet<>(List.of(mapper.readValue(ath, String[].class)));
+    public HashSet<String> getAuthorities() {
+        return new HashSet<>((ArrayList<String>) claims.get("ath"));
+    }
+    public String getAuthoritiesString() {
+        return String.join(".", ((ArrayList<String>) claims.get("ath")));
     }
 }

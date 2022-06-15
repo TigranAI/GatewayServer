@@ -21,7 +21,10 @@ public class JwtToken {
 
     public JwtClaims getClaims(JwtProperties properties) throws JwtException {
         try {
-            Claims claims = Jwts.parser().setSigningKey(properties.getSecret()).parseClaimsJws(value).getBody();
+            Claims claims = Jwts.parser()
+                    .setSigningKey(properties.getSecret())
+                    .parseClaimsJws(value)
+                    .getBody();
             return JwtClaims.of(claims);
         } catch (SignatureException ex) {
             throw new JwtInvalidSignatureException();

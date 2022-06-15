@@ -1,4 +1,4 @@
-package ru.tigran.gatewayproxy;
+package ru.tigran.gatewayproxy.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.route.RouteLocator;
@@ -15,22 +15,22 @@ public class GatewayConfig {
     @Autowired
     AdminFilter adminFilter;
 
-    @Bean
+    /*@Bean
     public RouteLocator routes(RouteLocatorBuilder builder) {
         return builder.routes()
-                .route("eureka-server", r -> r
-                        .path("/admin/**")
-                        .filters(f -> f.filter(adminFilter))
-                        .uri("http://localhost:4005"))
                 .route("eureka", r -> r
-                        .path("/eureka")
+                        .path("/admin/eureka")
                         .filters(f -> f.filter(adminFilter)
-                                .rewritePath("^/eureka\\/?(?<segment>.*)", "/${segment}"))
+                                .rewritePath("^/admin/eureka\\/?(?<segment>.*)", "/${segment}"))
                         .uri("http://localhost:8761"))
                 .route("eureka-resources", r -> r
                         .path("/eureka/**")
                         .filters(f -> f.filter(adminFilter))
                         .uri("http://localhost:8761"))
+                .route("admin-panel", r -> r
+                        .path("/admin/**")
+                        .filters(f -> f.filter(adminFilter))
+                        .uri("http://localhost:4005"))
                 .route("config-server", r -> r
                         .path("/config/**")
                         .uri("http://localhost:8888")
@@ -47,14 +47,8 @@ public class GatewayConfig {
                         .path("/editor/**")
                         .uri("http://localhost:4004")
                 )
-                .route("login", r -> r
-                        .method("GET")
-                        .and()
-                        .path("/auth")
-                        .uri("http://localhost:4002")
-                )
                 .route("main-page", r -> r
-                        .path("")
+                        .path("", "/")
                         .uri("http://localhost:4002")
                 )
                 .route("resource-server", r -> r
@@ -63,5 +57,5 @@ public class GatewayConfig {
                         .uri("http://localhost:4002")
                 )
                 .build();
-    }
+    }*/
 }

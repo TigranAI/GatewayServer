@@ -1,80 +1,71 @@
 package ru.tigran.gatewayproxy.filters;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import ru.tigran.gatewayproxy.exception.JwtException;
 import ru.tigran.gatewayproxy.exception.JwtExpiredException;
-import ru.tigran.gatewayproxy.jwt.JwtClaims;
 import ru.tigran.gatewayproxy.jwt.JwtProperties;
-import ru.tigran.gatewayproxy.jwt.JwtToken;
-import ru.tigran.gatewayproxy.util.ServerHttpResponseBuilder;
-
-import java.net.URI;
+import ru.tigran.gatewayproxy.util.ServerExchangeBuilder;
 
 @Component
-public abstract class BaseFilter implements GatewayFilter, IRequireRoles {
+@Slf4j
+public abstract class BaseFilter implements GatewayFilterFactory<BaseFilter.Config>, IRequireRoles {
     @Autowired
     JwtProperties properties;
-
-    @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            System.out.println(exchange.getRequest().getURI());
-            System.out.println(objectMapper.writeValueAsString(exchange.getRequest().getHeaders()));
-            System.out.println(objectMapper.writeValueAsString(exchange.getResponse().getHeaders()));
-            System.out.println();
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
+        ServerExchangeBuilder builder = ServerExchangeBuilder.of(exchange);
+        if (builder.hasJwtCookie()) {
+            if (builder.isAuthPath())
+                return chain.filter(builder.mutatePath("/profile").get());
+            try {
+                builder.parseToken(properties).refreshCookies();
+                if (builder.hasAccess(getRequiredRoles())) return chain.filter(builder.get());
+                return chain.filter(builder.mutatePath("/404").get());
+            } catch (JwtExpiredException e) {
+                return chain.filter(builder.mutatePath("/refresh").get());
+            } catch (JwtException e) {
+                return chain.filter(builder.removeCookies().mutatePath("/auth").get());
+            }
+        } else if (builder.isResourcePath() || builder.isAuthPath()) {
+            return chain.filter(builder.get());
         }
-
-        ServerHttpRequest request = exchange.getRequest();
-        HttpHeaders headers = request.getHeaders();
-        URI origin = request.getURI();
-        ServerHttpResponseBuilder builder = ServerHttpResponseBuilder.of(exchange.getResponse());
-
-        if (origin.getPath().equals("/auth")
-                || origin.getPath().endsWith(".css")
-                || origin.getPath().endsWith(".js")
-                || origin.getPath().endsWith(".ico"))
-            return chain.filter(exchange);
-
-        if (!headers.containsKey(properties.getHeader()))
-            return builder.redirect(origin, "auth").complete();
-
-        final String value = headers.get(properties.getHeader()).get(0);
-
-        try {
-            JwtToken token = JwtToken.from(value, properties);
-            JwtClaims claims = token.getClaims(properties);
-            if (hasAccess(claims)) {
-                exchange.getRequest().mutate()
-                        .header("user", String.valueOf(claims.getUsername()))
-                        .build();
-            } else return builder.redirect(origin, "404").complete();
-        } catch (JwtExpiredException e) {
-            return builder.redirect(origin, "refresh").complete();
-        } catch (JwtException e) {
-            return builder.redirect(origin, "auth").complete();
-        }
-
-        return chain.filter(exchange);
+        return chain.filter(builder.removeCookies().mutatePath("/auth").get());
     }
 
-    private boolean hasAccess(JwtClaims claims) {
-        try {
-            return claims.getAuthorities().containsAll(getRequiredRoles());
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            return false;
+    @Override
+    public GatewayFilter apply(Config config) {
+        return this::filter;
+    }
+
+    @Override
+    public Class<Config> getConfigClass() {
+        return BaseFilter.Config.class;
+    }
+
+    @Override
+    public Config newConfig() {
+        return new Config(this.getClass().getTypeName());
+    }
+
+    public static class Config {
+
+        public Config(String name){
+            this.name = name;
+        }
+        private String name;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
         }
     }
 }
